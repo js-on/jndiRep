@@ -53,6 +53,7 @@ def decode_payload(log: str) -> bytes:
         payload = re.sub(r'\$\{\w+:(\w+)\}', r"\1", log.decode()).encode()
     return payload
 
+
 def run(size: int, grep: str):
     while len(paths) != 0:
         path = paths.pop()
@@ -155,7 +156,8 @@ def report(api_key: str, include_logs: bool, comment: str, dedup: bool):
                 "categories": "21",
                 "comment": msg
             }
-            res = requests.request(method='POST', url=url, headers=headers, params=data)
+            res = requests.request(
+                method='POST', url=url, headers=headers, params=data)
             if res.status_code // 100 == 4:
                 error(res.text)
             else:
@@ -180,7 +182,8 @@ def main():
                     default="Request related to CVE-2021-44228")
     ap.add_argument("--include-logs", action="store_true", default=False,
                     help="Include logs in your report. PII will NOT be stripped of!!!")
-    ap.add_argument("--no-dedup", action="store_true", default=False, help="If set, report ever occurrence of IP. Default: Report only once.")
+    ap.add_argument("--no-dedup", action="store_true", default=False,
+                    help="If set, report ever occurrence of IP. Default: Report only once.")
     args = ap.parse_args(sys.argv[1:])
 
     if args.report:
@@ -201,7 +204,12 @@ def main():
         print_findings()
 
     if args.report:
-        report(args.api_key, args.include_logs, args.comment, not args.no_dedup)
+        report(args.api_key, args.include_logs,
+               args.comment, not args.no_dedup)
+
+    file_cnt = len(findings)
+    log_cnt = sum([len(finding.lines) for finding in findings])
+    info(f"Found {log_cnt} log entries in {file_cnt} files")
 
 
 if __name__ == "__main__":
