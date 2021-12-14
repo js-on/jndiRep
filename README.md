@@ -5,6 +5,8 @@ Basically a **bad** grep on even **worse** drugs.
 - print results to stdout or file
 - report ips (incl. logs) to AbuseIPDB
 
+**jndiRep must be run as superuser**
+
 ## Scanning
 - Directory: `python3 jndiRep.py -d /path/to/directory`
 - File: `python3 jndiRep.py -f /path/to/input.txt`

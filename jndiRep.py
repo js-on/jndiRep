@@ -144,7 +144,7 @@ def write_findings(output: str):
         data = {}
         for finding in findings:
             data[finding.path] = [line.decode() for line in finding.lines]
-        json.dump(data, open(output, "w"))
+        json.dump(data, open(output, "w"), indent=4)
     elif output.endswith(".csv"):
         info("Store findings in CSV format")
         with open(output, "w") as f:
@@ -162,9 +162,11 @@ def write_findings(output: str):
     else:
         with open(output, "w") as f:
             for finding in findings:
+                print(finding.lines)
                 f.write(f"{finding.path}\n")
-                for log in finding.lines:
-                    f.write(f"{log.decode()}\n")
+                for line in finding.lines:
+                    # print(line)
+                    f.write(f"{line.decode()}\n")
                 f.write("\n")
 
     info(f"Findings written to {output}")
@@ -276,4 +278,6 @@ def main():
 
 
 if __name__ == "__main__":
+    if not os.getuid() == 0:
+        error("jndiRep must be run as superuser")
     main()
