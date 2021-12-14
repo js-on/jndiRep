@@ -5,6 +5,7 @@ import subprocess
 import threading
 import requests
 import argparse
+import docker
 import base64
 import json
 import sys
@@ -69,6 +70,39 @@ def run(size: int, grep: str):
         except Exception as e:
             error(
                 str(e) + "\nPlease file an issue at https://github.com/js-on/jndiRep/issues")
+
+
+def scan_docker(grep: str):
+    container_ids = [container.decode().split(" ")[0] for container in subprocess.check_output(["docker", "ps"]).splitlines()[1:]]
+    grep = grep.encode()
+    for cid in container_ids:
+        client = docker.client.from_env()
+        exec_info = client.images.client.api.exec_create(container=cid, cmd="find")
+        res = client.images.client.api.exec_start(exec_id=exec_info["Id"])
+        res = res.splitlines()
+        for line in res:
+            if b".log" in line:
+                paths.append(line[1:].decode())
+        
+        info(f"Scanning {len(paths)} files in container #{cid}")
+        for file in paths:
+            exec_info = client.images.client.api.exec_create(container=cid, cmd=f"cat {file}")
+            res = client.images.client.api.exec_start(exec_id=exec_info["Id"])
+            res = res.splitlines()
+            log = []
+            for line in res:
+                if grep in line:
+                    for filter in FILTER:
+                        if filter in line:
+                            return
+                    t = line.strip()
+                    payload = decode_payload(t)
+                    if payload != b"":
+                        t += b"\nPayload: " + payload
+                    log.append(t)
+
+            if len(log) != 0:
+                findings.append(JNDI(path=f"{cid}:{file}", lines=log))
 
 
 def scan_log(jobs: int, grep: str):
@@ -227,6 +261,7 @@ def main():
     ap.add_argument("-d", "--directory", type=str, help="Directory to scan")
     ap.add_argument("-f", "--file", type=str, help="File to scan")
     ap.add_argument("-l", "--logs", action="store_true", help="Use `lsof` to find all .log files and scan them")
+    ap.add_argument("-D", "--docker", action="store_true", help="Inspect running containers and scan for log4j activity")
     ap.add_argument("-g", "--grep", type=str,
                     help="Custom word to grep for", default="jndi")
     ap.add_argument("-i", "--ignore", type=str, default="", help="Custom words to ignore (grep -v)")
@@ -238,11 +273,14 @@ def main():
                     help="Report IPs to AbuseIPDB with category 21 (malicious web request)", default=False)
     ap.add_argument("-c", "--comment", type=str, help="Comment sent with your report",
                     default="Request related to CVE-2021-44228")
-    ap.add_argument("--include-logs", action="store_true", default=False,
+    ap.add_argument("-I", "--include-logs", action="store_true", default=False,
                     help="Include logs in your report. PII will NOT be stripped of!!!")
     ap.add_argument("--no-dedup", action="store_true", default=False,
                     help="If set, report every occurrence of IP. Default: Report only once.")
     args = ap.parse_args(sys.argv[1:])
+
+    if not os.getuid() == 0 and not args.docker:
+        error("jndiRep must be run as superuser")
 
     if args.report:
         if not args.api_key:
@@ -254,6 +292,8 @@ def main():
 
     if args.logs:
         scan_log(args.threads, args.grep)
+    elif args.docker:
+        scan_docker(args.grep)
     elif args.directory:
         scan_directory(os.path.join(os.getcwd(), args.directory),
                        args.threads, args.grep)
@@ -277,6 +317,4 @@ def main():
 
 
 if __name__ == "__main__":
-    if not os.getuid() == 0:
-        error("jndiRep must be run as superuser")
     main()
