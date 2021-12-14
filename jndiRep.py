@@ -19,7 +19,7 @@ GREEN = "\x1b[32m"
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 IP_RE = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
-LOG_RE = re.compile(r'\d+\s(/.*\.log)')
+LOG_RE = re.compile(r'\d+\s(/.*\.log\.*)')
 FILTER = [b"jndiRep"]
 url = 'https://api.abuseipdb.com/api/v2/report'
 
@@ -146,7 +146,7 @@ def write_findings(output: str):
             data[finding.path] = [line.decode() for line in finding.lines]
         json.dump(data, open(output, "w"), indent=4)
     elif output.endswith(".csv"):
-        info("Store findings in CSV format")
+        info("Store findings in CSV format\nInfo: \"|\" is used as separator!")
         with open(output, "w") as f:
             f.write("File, Log, Payload\n")
             for finding in findings:

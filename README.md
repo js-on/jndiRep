@@ -18,7 +18,7 @@ Basically a **bad** grep on even **worse** drugs.
 You can either print results to a file or to stdout (includes coloring of IPs and payloads).
 - stdout: `python3 jndiRep.py ...`
 - file: `python3 jndiRep.py ... -o /path/to/output.txt`
-Use *.json* or *.csv* as extension to output data as JSON or CSV, otherwise the output will be the same as stdout.
+Use *.json* or *.csv* as extension to output data as JSON or CSV, otherwise the output will be the same as stdout. For CSV `|` is used as separator to avoid issues with log lines, but please prefer JSON as it's not affected by weird chars in the findings.
 
 ## Reporting
 For reporting, an API Key (hex string of length 80) for AbuseIPDB is required, which you can obtain by register at the service and request IP Reporting ability.
