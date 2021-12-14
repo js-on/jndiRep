@@ -71,26 +71,56 @@ def run(size: int, grep: str):
                 str(e) + "\nPlease file an issue at https://github.com/js-on/jndiRep/issues")
 
 
+def scan_docker(grep: str):
+    ps = subprocess.check_output(["docker", "ps"]).splitlines()[1:]
+    container_ids = [container.decode().split(" ")[0] for container in ps]
+    container_names = [container.decode().split(" ")[-1] for container in ps]
+    grep = grep.encode()
+    cnt = 1
+    for cid, cname in zip(container_ids, container_names):
+        info(f"Scanning #{cid} - ({cnt}/{len(container_ids)})")
+        res = subprocess.check_output(
+            ["docker", "logs", cid], stderr=subprocess.DEVNULL)
+        res = res.splitlines()
+        log = []
+        for line in res:
+            if grep in line:
+                for filter in FILTER:
+                    if filter in line:
+                        return
+                t = line.strip()
+                payload = decode_payload(t)
+                if payload != b"":
+                    t += b"\nPayload: " + payload
+                log.append(t)
+
+        if len(log) != 0:
+            findings.append(JNDI(path=f"{cname}", lines=log))
+        cnt += 1
+
+
 def scan_log(jobs: int, grep: str):
     global paths
     info("Scanning system with lsof")
-    data = subprocess.check_output(["lsof"], stderr=subprocess.DEVNULL).splitlines()
+    data = subprocess.check_output(
+        ["lsof"], stderr=subprocess.DEVNULL).splitlines()
     paths = [line for line in data if b".log" in line]
     paths = [re.findall(LOG_RE, p.decode())[0] for p in paths]
 
     size = len(paths)
     if size < jobs:
         jobs = size
-    
+
     procs = []
-    info(f"Found {size} log files.\nSpawning {jobs} threads\nStart at {ctime(time())}")
+    info(
+        f"Found {size} log files.\nSpawning {jobs} threads\nStart at {ctime(time())}")
     for i in range(jobs):
         procs.append(threading.Thread(target=run, args=(size, grep)))
     for proc in procs:
         proc.start()
     for proc in procs:
         proc.join()
-    
+
     print()
     info(f"Stop at {ctime(time())}")
 
@@ -226,10 +256,14 @@ def main():
                     type=str, help="AbuseIPDB Api Key")
     ap.add_argument("-d", "--directory", type=str, help="Directory to scan")
     ap.add_argument("-f", "--file", type=str, help="File to scan")
-    ap.add_argument("-l", "--logs", action="store_true", help="Use `lsof` to find all .log files and scan them")
+    ap.add_argument("-l", "--logs", action="store_true",
+                    help="Use `lsof` to find all .log files and scan them")
+    ap.add_argument("-D", "--docker", action="store_true",
+                    help="Inspect running containers and scan for log4j activity")
     ap.add_argument("-g", "--grep", type=str,
                     help="Custom word to grep for", default="jndi")
-    ap.add_argument("-i", "--ignore", type=str, default="", help="Custom words to ignore (grep -v)")
+    ap.add_argument("-i", "--ignore", type=str, default="",
+                    help="Custom words to ignore (grep -v)")
     ap.add_argument("-o", "--output", type=str,
                     help="File to store results. stdout if not set. Use .csv|.json extension for automatic data formatting", default=None)
     ap.add_argument("-t", "--threads", type=int,
@@ -238,22 +272,27 @@ def main():
                     help="Report IPs to AbuseIPDB with category 21 (malicious web request)", default=False)
     ap.add_argument("-c", "--comment", type=str, help="Comment sent with your report",
                     default="Request related to CVE-2021-44228")
-    ap.add_argument("--include-logs", action="store_true", default=False,
+    ap.add_argument("-I", "--include-logs", action="store_true", default=False,
                     help="Include logs in your report. PII will NOT be stripped of!!!")
     ap.add_argument("--no-dedup", action="store_true", default=False,
                     help="If set, report every occurrence of IP. Default: Report only once.")
     args = ap.parse_args(sys.argv[1:])
 
+    if not os.getuid() == 0:
+        error("jndiRep must be run as superuser")
+
     if args.report:
         if not args.api_key:
             error("Api Key is required. (-a, --api-key)")
-    
+
     if args.ignore:
         for filter in args.ignore.split(","):
             FILTER.append(filter.encode())
 
     if args.logs:
         scan_log(args.threads, args.grep)
+    elif args.docker:
+        scan_docker(args.grep)
     elif args.directory:
         scan_directory(os.path.join(os.getcwd(), args.directory),
                        args.threads, args.grep)
@@ -261,7 +300,7 @@ def main():
         scan_file(os.path.join(args.file), args.grep)
     else:
         error("Either (-f) or (-d) or (-l) is required.")
-    
+
     file_cnt = len(findings)
     log_cnt = sum([len(finding.lines) for finding in findings])
     info(f"Found {log_cnt} log entries in {file_cnt} files")
@@ -277,6 +316,4 @@ def main():
 
 
 if __name__ == "__main__":
-    if not os.getuid() == 0:
-        error("jndiRep must be run as superuser")
     main()

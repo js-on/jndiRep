@@ -10,9 +10,11 @@ Basically a **bad** grep on even **worse** drugs.
 ## Scanning
 - Directory: `python3 jndiRep.py -d /path/to/directory`
 - File: `python3 jndiRep.py -f /path/to/input.txt`
-- Custom filter: `python3 jndiRep.py ... -g "ldap"`
-- Threading: If scanning a directory, 4 threads will work on the files in parallel. You can change this by using `-t <threads>`.
 - All logs: `python3 jndiRep.py -l` will use **lsof** to scan for all possible log paths and scan them
+- Docker: `python3 jndiRep.py -D` will scan output of `docker logs <id>` for possible attacks
+- Custom filter: `python3 jndiRep.py ... -g "ldap"` searches for custom words instead of the default `jndi`
+- Ignore words: `python3 jndiRep.py ... -i "jndiRep,test,js-on"` ignores comma separated values in findings
+- Threading: If scanning a directory, 4 threads will work on the files in parallel. You can change this by using `-t <threads>`.
 
 ## Output
 You can either print results to a file or to stdout (includes coloring of IPs and payloads).
@@ -36,7 +38,7 @@ For reporting, an API Key (hex string of length 80) for AbuseIPDB is required, w
 
 ## Help
 ```
-usage: jndiRep.py [-h] [-a API_KEY] [-d DIRECTORY] [-f FILE] [-l] [-g GREP] [-i IGNORE] [-o OUTPUT] [-t THREADS] [-r] [-c COMMENT] [--include-logs] [--no-dedup]
+usage: jndiRep.py [-h] [-a API_KEY] [-d DIRECTORY] [-f FILE] [-l] [-D] [-g GREP] [-i IGNORE] [-o OUTPUT] [-t THREADS] [-r] [-c COMMENT] [-I] [--no-dedup]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -46,6 +48,7 @@ optional arguments:
                         Directory to scan
   -f FILE, --file FILE  File to scan
   -l, --logs            Use `lsof` to find all .log files and scan them
+  -D, --docker          Inspect running containers and scan for log4j activity
   -g GREP, --grep GREP  Custom word to grep for
   -i IGNORE, --ignore IGNORE
                         Custom words to ignore (grep -v)
@@ -56,6 +59,6 @@ optional arguments:
   -r, --report          Report IPs to AbuseIPDB with category 21 (malicious web request)
   -c COMMENT, --comment COMMENT
                         Comment sent with your report
-  --include-logs        Include logs in your report. PII will NOT be stripped of!!!
+  -I, --include-logs    Include logs in your report. PII will NOT be stripped of!!!
   --no-dedup            If set, report every occurrence of IP. Default: Report only once.
 ```
