@@ -189,7 +189,7 @@ def write_findings(output: str):
     elif output.endswith(".csv"):
         info("Store findings in CSV format\nInfo: \"|\" is used as separator!")
         with open(output, "w") as f:
-            f.write("File, Log, Payload\n")
+            f.write("File|Log|Payload\n")
             for finding in findings:
                 for line in finding.lines:
                     line = line.decode()
@@ -198,7 +198,7 @@ def write_findings(output: str):
                         line = line.split("\nPayload: ")[0]
                     else:
                         payload = ""
-                    t = f"{finding.path}, {line}, {payload}\n"
+                    t = f"{finding.path}|{line}|{payload}\n"
                     f.write(t)
     else:
         with open(output, "w") as f:
