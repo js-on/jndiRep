@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 from shutil import get_terminal_size
 from time import time, ctime
+import subprocess
 import threading
 import requests
 import argparse
 import base64
+import json
 import sys
 import re
 import os
@@ -17,6 +19,8 @@ GREEN = "\x1b[32m"
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 IP_RE = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
+LOG_RE = re.compile(r'\d+\s(/.*\.log)')
+FILTER = [b"jndiRep"]
 url = 'https://api.abuseipdb.com/api/v2/report'
 
 
@@ -34,7 +38,7 @@ def error(msg: str):
 
 def info(msg: str):
     msg = msg.replace("\n", "\n    ")
-    print(f"{GREEN}[!]{RESET} {msg}")
+    print(f"{GREEN}[i]{RESET} {msg}")
 
 
 def progress(size: int):
@@ -60,9 +64,35 @@ def run(size: int, grep: str):
         progress(size)
         try:
             scan_file(path, grep)
+        except FileNotFoundError:
+            pass
         except Exception as e:
             error(
                 str(e) + "\nPlease file an issue at https://github.com/js-on/jndiRep/issues")
+
+
+def scan_log(jobs: int, grep: str):
+    global paths
+    info("Scanning system with lsof")
+    data = subprocess.check_output(["lsof"], stderr=subprocess.DEVNULL).splitlines()
+    paths = [line for line in data if b".log" in line]
+    paths = [re.findall(LOG_RE, p.decode())[0] for p in paths]
+
+    size = len(paths)
+    if size < jobs:
+        jobs = size
+    
+    procs = []
+    info(f"Found {size} log files.\nSpawning {jobs} threads\nStart at {ctime(time())}")
+    for i in range(jobs):
+        procs.append(threading.Thread(target=run, args=(size, grep)))
+    for proc in procs:
+        proc.start()
+    for proc in procs:
+        proc.join()
+    
+    print()
+    info(f"Stop at {ctime(time())}")
 
 
 def scan_directory(directory: str, jobs: int, grep: str):
@@ -94,6 +124,9 @@ def scan_file(path: str, grep: str):
         grep = grep.encode()
         for line in f:
             if grep in line:
+                for filter in FILTER:
+                    if filter in line:
+                        return
                 t = line.strip()
                 payload = decode_payload(t)
                 if payload != b"":
@@ -105,12 +138,34 @@ def scan_file(path: str, grep: str):
 
 
 def write_findings(output: str):
-    with open(output, "w") as f:
+    print()
+    if output.endswith(".json"):
+        info("Store findings in JSON format")
+        data = {}
         for finding in findings:
-            f.write(f"{finding.path}\n")
-            for log in finding.lines:
-                f.write(f"{log.decode()}\n")
-            f.write("\n")
+            data[finding.path] = [line.decode() for line in finding.lines]
+        json.dump(data, open(output, "w"))
+    elif output.endswith(".csv"):
+        info("Store findings in CSV format")
+        with open(output, "w") as f:
+            f.write("File, Log, Payload\n")
+            for finding in findings:
+                for line in finding.lines:
+                    line = line.decode()
+                    if "\nPayload: " in line:
+                        payload = line.split("\nPayload: ")[1]
+                        line = line.split("\nPayload: ")[0]
+                    else:
+                        payload = ""
+                    t = f"{finding.path}, {line}, {payload}\n"
+                    f.write(t)
+    else:
+        with open(output, "w") as f:
+            for finding in findings:
+                f.write(f"{finding.path}\n")
+                for log in finding.lines:
+                    f.write(f"{log.decode()}\n")
+                f.write("\n")
 
     info(f"Findings written to {output}")
 
@@ -170,10 +225,12 @@ def main():
                     type=str, help="AbuseIPDB Api Key")
     ap.add_argument("-d", "--directory", type=str, help="Directory to scan")
     ap.add_argument("-f", "--file", type=str, help="File to scan")
+    ap.add_argument("-l", "--logs", action="store_true", help="Use `lsof` to find all .log files and scan them")
     ap.add_argument("-g", "--grep", type=str,
                     help="Custom word to grep for", default="jndi")
+    ap.add_argument("-i", "--ignore", type=str, default="", help="Custom words to ignore (grep -v)")
     ap.add_argument("-o", "--output", type=str,
-                    help="File to store results. stdout if not set", default=None)
+                    help="File to store results. stdout if not set. Use .csv|.json extension for automatic data formatting", default=None)
     ap.add_argument("-t", "--threads", type=int,
                     help="Number of threads to start. Default is 4", default=4)
     ap.add_argument("-r", "--report", action="store_true",
@@ -183,20 +240,30 @@ def main():
     ap.add_argument("--include-logs", action="store_true", default=False,
                     help="Include logs in your report. PII will NOT be stripped of!!!")
     ap.add_argument("--no-dedup", action="store_true", default=False,
-                    help="If set, report ever occurrence of IP. Default: Report only once.")
+                    help="If set, report every occurrence of IP. Default: Report only once.")
     args = ap.parse_args(sys.argv[1:])
 
     if args.report:
         if not args.api_key:
             error("Api Key is required. (-a, --api-key)")
+    
+    if args.ignore:
+        for filter in args.ignore.split(","):
+            FILTER.append(filter.encode())
 
-    if args.directory:
+    if args.logs:
+        scan_log(args.threads, args.grep)
+    elif args.directory:
         scan_directory(os.path.join(os.getcwd(), args.directory),
                        args.threads, args.grep)
     elif args.file:
         scan_file(os.path.join(args.file), args.grep)
     else:
-        error("Either (-f) or (-d) is required.")
+        error("Either (-f) or (-d) or (-l) is required.")
+    
+    file_cnt = len(findings)
+    log_cnt = sum([len(finding.lines) for finding in findings])
+    info(f"Found {log_cnt} log entries in {file_cnt} files")
 
     if args.output:
         write_findings(os.path.join(os.getcwd(), args.output))
@@ -206,10 +273,6 @@ def main():
     if args.report:
         report(args.api_key, args.include_logs,
                args.comment, not args.no_dedup)
-
-    file_cnt = len(findings)
-    log_cnt = sum([len(finding.lines) for finding in findings])
-    info(f"Found {log_cnt} log entries in {file_cnt} files")
 
 
 if __name__ == "__main__":
