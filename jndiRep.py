@@ -16,6 +16,7 @@ findings = []
 WIDTH = get_terminal_size().columns
 RED = "\x1b[31m"
 GREEN = "\x1b[32m"
+CYAN = "\x1b[36m"
 RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 IP_RE = re.compile(r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}')
@@ -28,6 +29,15 @@ class JNDI:
     def __init__(self, path: str, lines: list):
         self.path = path
         self.lines = lines
+
+
+def prompt():
+    print(f"{RED}  __ {CYAN}          __ __ ______              {RESET}")
+    print(f"{RED} |__|{CYAN}.-----.--|  |__|   __ \.-----.-----.{RESET}")
+    print(f"{RED} |  |{CYAN}|     |  _  |  |      <|  -__|  _  |{RESET}")
+    print(f"{RED} |  |{CYAN}|__|__|_____|__|___|__||_____|   __|{RESET}")
+    print(f"{RED}|___|{CYAN}                             |__|   {RESET}")
+    print(f"{RED}     (c) 2021{GREEN} - Jakob Schaffarczyk{RESET}\n")
 
 
 def error(msg: str):
@@ -252,6 +262,7 @@ def report(api_key: str, include_logs: bool, comment: str, dedup: bool):
 
 
 def main():
+    prompt()
     ap = argparse.ArgumentParser()
     ap.add_argument("-a", "--api-key",
                     type=str, help="AbuseIPDB Api Key")
