@@ -106,6 +106,7 @@ def scan_log(jobs: int, grep: str):
         ["lsof"], stderr=subprocess.DEVNULL).splitlines()
     paths = [line for line in data if b".log" in line]
     paths = [re.findall(LOG_RE, p.decode())[0] for p in paths]
+    paths = list(set(paths))
 
     size = len(paths)
     if size < jobs:

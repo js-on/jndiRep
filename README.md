@@ -16,6 +16,13 @@ Basically a **bad** grep on even **worse** drugs.
 - Ignore words: `python3 jndiRep.py ... -i "jndiRep,test,js-on"` ignores comma separated values in findings
 - Threading: If scanning a directory, 4 threads will work on the files in parallel. You can change this by using `-t <threads>`.
 
+## Examples
+> ![Directory scan](dir.png)
+> `python3 jndiRep.py -d /var/log/plesk`
+
+> ![File scan](file.png)
+> `python3 jndiRep.py -f /var/log/nginx/access.log`
+
 ## Output
 You can either print results to a file or to stdout (includes coloring of IPs and payloads).
 - stdout: `python3 jndiRep.py ...`
