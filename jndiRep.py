@@ -162,7 +162,6 @@ def write_findings(output: str):
     else:
         with open(output, "w") as f:
             for finding in findings:
-                print(finding.lines)
                 f.write(f"{finding.path}\n")
                 for line in finding.lines:
                     # print(line)
