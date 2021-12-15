@@ -237,7 +237,11 @@ def report(api_key: str, include_logs: bool, comment: str, dedup: bool):
         for line in finding.lines:
             line = line.decode()
             msg = comment
-            ip = line.split(" ")[0]
+            # ip = line.split(" ")[0]
+            try:
+                ip = IP_RE.findall(line)[0]
+            except:
+                continue
 
             # Deduplication of reports
             if dedup:
