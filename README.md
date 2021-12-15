@@ -7,6 +7,17 @@ Basically a **bad** grep on even **worse** drugs.
 
 **jndiRep must be run as superuser**
 
+## How to scan?
+Please be aware, that not all applications will log either into `/var/log/...` or even log files. There's no scan option covering all possibilities. Use the following steps to cover most of your log files.
+1. **Know your applications:**<br>
+If you know what critical systems you're running, you also know where they store their logs. Use `python3 jndiRep.py -d <directory> -o filename.json` to scan each directory. Don't forget to save the results in a file.
+2. **Hidden logs:**<br>
+You might not be aware of some applications. Luckily, one can find most of them via `lsof | grep \.log`. Use `python3 jndiRep.py -l -o filename.json` to make use of lsof and scan each file found. `lsof` might not find logs like `access.log.1`. You need to figure these directories out if not covered by the first scan, and use the `-d` parameter.
+3. **Docker containers:**<br>
+If your applications run via Docker, you can make use of the `docker logs <container id>` output. Use `python3 jndiRep.py -D` to scan the log output of each running container.
+
+> If you're missing any scan option, please let me know.
+
 ## Scanning
 - Directory: `python3 jndiRep.py -d /path/to/directory`
 - File: `python3 jndiRep.py -f /path/to/input.txt`
